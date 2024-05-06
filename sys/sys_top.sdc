@@ -22,11 +22,11 @@ set_clock_groups -exclusive \
    -group [get_clocks { FPGA_CLK3_50 }]
 
 set_false_path -from [get_ports {KEY*}]
-set_false_path -from [get_ports {BTN_*}]
-set_false_path -to   [get_ports {LED_*}]
+#set_false_path -from [get_ports {BTN_*}]
+#set_false_path -to   [get_ports {LED_*}]
 set_false_path -to   [get_ports {VGA_*}]
 set_false_path -from [get_ports {VGA_EN}]
-set_false_path -to   [get_ports {AUDIO_SPDIF}]
+#set_false_path -to   [get_ports {AUDIO_SPDIF}]
 set_false_path -to   [get_ports {AUDIO_L}]
 set_false_path -to   [get_ports {AUDIO_R}]
 set_false_path -from {get_ports {SW[*]}}
@@ -35,7 +35,7 @@ set_false_path -from {cfg[*]}
 set_false_path -from {VSET[*]}
 set_false_path -to   {wcalc[*] hcalc[*]}
 set_false_path -to   {hdmi_width[*] hdmi_height[*]}
-set_false_path -to   {deb_* btn_en btn_up}
+#set_false_path -to   {deb_* btn_en btn_up}
 
 set_multicycle_path -to {*_osd|osd_vcnt*} -setup 2
 set_multicycle_path -to {*_osd|osd_vcnt*} -hold 1
