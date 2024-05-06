@@ -1,3 +1,5 @@
+Apple-II MiSTer QMTECH -- Tested: Working Video 1080p & Sound
+
 # [Apple IIe](https://en.wikipedia.org/wiki/Apple_IIe) for [MiSTer](https://github.com/MiSTer-devel/Main_MiSTer/wiki)
 
 This is a MiSTer port of the Apple IIe core from MiST.
