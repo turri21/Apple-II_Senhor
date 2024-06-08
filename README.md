@@ -1,5 +1,8 @@
-Apple-II MiSTer QMTECH -- Tested: Working Video 1080p & Sound
+-=(Apple-II_Senhor notes)=-
 
+Tested: Working Video 720p, 1080p & Sound -- Use Quartus 17.0.2 on Linux to synthesize this core (see the "Building core" section).
+
+Only Quartus 23.1 on Windows synthesizes a working .rbf
 # [Apple IIe](https://en.wikipedia.org/wiki/Apple_IIe) for [MiSTer](https://github.com/MiSTer-devel/Main_MiSTer/wiki)
 
 This is a MiSTer port of the Apple IIe core from MiST.
