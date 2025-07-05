@@ -1,3 +1,8 @@
+-=(Apple-II_Senhor notes)=-
+
+Tested: Working Video 720p, 1080p & Sound
+
+___
 # [Apple IIe](https://en.wikipedia.org/wiki/Apple_IIe) for [MiSTer](https://github.com/MiSTer-devel/Main_MiSTer/wiki)
 
 This is a MiSTer port of the Apple IIe core from MiST.
