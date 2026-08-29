@@ -199,6 +199,45 @@ architecture arch of apple2_top is
         RTC             : in std_logic_vector(64 downto 0));
   end component;
 
+  component disk_ii is
+    port (
+      CLK_14M        : in  std_logic;
+      CLK_2M         : in  std_logic;
+      PHASE_ZERO     : in  std_logic;
+      IO_SELECT      : in  std_logic;
+      DEVICE_SELECT  : in  std_logic;
+      RESET          : in  std_logic;
+      DISK_READY     : in  std_logic_vector(1 downto 0);
+      A              : in  unsigned(15 downto 0);
+      D_IN           : in  unsigned(7 downto 0);
+      D_OUT          : out unsigned(7 downto 0);
+      D1_ACTIVE      : out std_logic;
+      D2_ACTIVE      : out std_logic;
+      D1_MOTOR_ON    : out std_logic;
+      D2_MOTOR_ON    : out std_logic;
+      D1_IO_ACTIVE   : out std_logic;
+      D2_IO_ACTIVE   : out std_logic;
+      D1_STEP_ACTIVE : out std_logic;
+      D2_STEP_ACTIVE : out std_logic;
+      D1_TRACK_ZERO_STEP : out std_logic;
+      D2_TRACK_ZERO_STEP : out std_logic;
+      D1_WP          : in  std_logic;
+      D2_WP          : in  std_logic;
+      TRACK1         : out unsigned(5 downto 0);
+      TRACK1_ADDR    : out unsigned(12 downto 0);
+      TRACK1_DI      : out unsigned(7 downto 0);
+      TRACK1_DO      : in  unsigned(7 downto 0);
+      TRACK1_WE      : out std_logic;
+      TRACK1_BUSY    : in  std_logic;
+      TRACK2         : out unsigned(5 downto 0);
+      TRACK2_ADDR    : out unsigned(12 downto 0);
+      TRACK2_DI      : out unsigned(7 downto 0);
+      TRACK2_DO      : in  unsigned(7 downto 0);
+      TRACK2_WE      : out std_logic;
+      TRACK2_BUSY    : in  std_logic
+    );
+  end component;
+
 
   signal CLK_2M, CLK_2M_D, PHASE_ZERO, PHASE_ZERO_R, PHASE_ZERO_F : std_logic;
   signal IO_SELECT, DEVICE_SELECT : std_logic_vector(7 downto 0);
@@ -439,7 +478,7 @@ begin
 	 
   DISK_ACT <= not (D1_ACTIVE or D2_ACTIVE);
 
-  disk : entity work.disk_ii port map (
+  disk : component disk_ii port map (
     CLK_14M        => CLK_14M,
     CLK_2M         => CLK_2M,
     PHASE_ZERO     => PHASE_ZERO,
