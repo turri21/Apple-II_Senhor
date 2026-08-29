@@ -55,7 +55,7 @@ always @(*) begin
 		3'd2: x_center_offset = -8'sd32;
 		3'd3: x_center_offset = -8'sd48;
 		3'd4: x_center_offset = -8'sd64;
-		3'd5: x_center_offset = -8'sd80;
+		3'd5: x_center_offset = -8'sd72;
 		3'd6: x_center_offset =  8'sd32;
 		3'd7: x_center_offset =  8'sd48;
 		default: x_center_offset = 8'sd0;
