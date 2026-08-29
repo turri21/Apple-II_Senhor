@@ -70,8 +70,16 @@ port (
     ROMSWITCH      : in std_logic;
 
 	PS2_Key        : in  std_logic_vector(10 downto 0);
+  virtual_keyboard_active : in std_logic;
+  virtual_keyboard_event : in std_logic;
+  virtual_keyboard_pressed : in std_logic;
+  virtual_keyboard_code : in std_logic_vector(6 downto 0);
+  virtual_control : in std_logic;
+  virtual_open_apple : in std_logic;
+  virtual_closed_apple : in std_logic;
 	joy            : in  std_logic_vector(5 downto 0);
 	joy_an         : in  std_logic_vector(15 downto 0);
+
 
 	-- disk control
 	TRACK1         : out unsigned( 5 downto 0); -- Current track (0-34)
@@ -407,6 +415,13 @@ begin
 
   keyboard : entity work.keyboard port map (
     PS2_Key  => PS2_Key,
+    virtual_active => virtual_keyboard_active,
+    virtual_event => virtual_keyboard_event,
+    virtual_pressed => virtual_keyboard_pressed,
+    virtual_code => virtual_keyboard_code,
+    virtual_control => virtual_control,
+    virtual_open_apple => virtual_open_apple,
+    virtual_closed_apple => virtual_closed_apple,
     CLK_14M  => CLK_14M,
 	 reset    => reset_cold, -- use reset_cold, not reset so we keep the
 	                         -- keyboard state machine running for key up 

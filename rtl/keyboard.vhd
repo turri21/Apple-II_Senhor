@@ -19,6 +19,13 @@ entity keyboard is
   port (
     CLK_14M  : in std_logic;
     PS2_Key  : in std_logic_vector(10 downto 0);  -- From PS/2 port
+    virtual_active       : in std_logic;
+    virtual_event        : in std_logic;
+    virtual_pressed      : in std_logic;
+    virtual_code         : in std_logic_vector(6 downto 0);
+    virtual_control      : in std_logic;
+    virtual_open_apple   : in std_logic;
+    virtual_closed_apple : in std_logic;
     reads    : in std_logic;            -- Read strobe
     reset    : in std_logic;
     akd      : buffer std_logic;        -- Any key down
@@ -26,7 +33,7 @@ entity keyboard is
     open_apple:    out std_logic;
     closed_apple:  out std_logic;
     soft_reset:    out std_logic := '0';
-  	video_toggle:  out std_logic := '0';	  -- signal to control change of video modes
+    video_toggle:  out std_logic := '0';	  -- signal to control change of video modes
     palette_toggle:out std_logic := '0'	  -- signal to control change of paleetes
 	);
 end keyboard;
@@ -42,6 +49,10 @@ architecture rtl of keyboard is
   signal key_pressed        : std_logic;  -- Key pressed & not read
   signal ctrl,shift,caplock : std_logic;
   signal old_stb            : std_logic;
+  signal old_virtual_event  : std_logic;
+  signal virtual_active_d   : std_logic;
+  signal virtual_code_latched : unsigned(6 downto 0);
+  signal virtual_data       : std_logic;
   signal rep_timer          : unsigned(22 downto 0);
 
   -- Special PS/2 keyboard codes
@@ -80,7 +91,8 @@ begin
    wren => '0',
    unsigned(q) => rom_out);
 
-  K <= key_pressed & rom_out(6 downto 0);
+    K <= key_pressed & virtual_code_latched when virtual_data = '1' else
+      key_pressed & rom_out(6 downto 0);
 
   caplock_ctrl : process (CLK_14M, reset)
   begin
@@ -98,13 +110,26 @@ begin
     if reset = '1' then
       shift <= '0';
       ctrl <= '0';
-      --open_apple<='0';
-      --closed_apple<='0';
+      open_apple <= '0';
+      closed_apple <= '0';
 		soft_reset<='0';
 		video_toggle<='0';
 		palette_toggle<='0';
     elsif rising_edge(CLK_14M) then
-     if state = HAVE_CODE then
+      if virtual_active = '1' then
+        shift <= '0';
+        ctrl <= virtual_control;
+        open_apple <= virtual_open_apple;
+        closed_apple <= virtual_closed_apple;
+        soft_reset <= '0';
+        video_toggle <= '0';
+        palette_toggle <= '0';
+      elsif virtual_active_d = '1' then
+        shift <= '0';
+        ctrl <= '0';
+        open_apple <= '0';
+        closed_apple <= '0';
+      elsif state = HAVE_CODE then
         if code = LEFT_SHIFT or code = RIGHT_SHIFT then
           shift <= '1';
         elsif code = LEFT_CTRL then
@@ -152,32 +177,66 @@ begin
       latched_code <= (others => '0');
       latched_ext <= '0';
       key_pressed <= '0';
+      akd <= '0';
+      old_stb <= '0';
+      old_virtual_event <= '0';
+      virtual_active_d <= '0';
+      virtual_code_latched <= (others => '0');
+      virtual_data <= '0';
+      rep_timer <= (others => '0');
     elsif rising_edge(CLK_14M) then
-      state <= next_state;
+      virtual_active_d <= virtual_active;
       if reads = '1' then key_pressed <= '0'; end if;
-      if state = HAVE_CODE then
-        old_stb <= ps2_key(10);
-      end if;
-      if state = GOT_KEY_UP_CODE then
-        akd <= '0';
-      end if;
-      if state = NORMAL_KEY then
-        -- set up keyboard ROM read address
-        latched_code <= code ;
-        latched_ext <= ext;
-      end if;
-      if state = KEY_READY and junction_code /= x"FF" then
-        -- key code ready from ROM
-         akd <= '1';
-         key_pressed <= '1';
-         rep_timer <= to_unsigned(7000000, 23); -- 0.5s
-      end if;
-      if akd = '1' then
-         rep_timer <= rep_timer - 1;
-         if rep_timer = 0 then
-            rep_timer <= to_unsigned(933333, 23); -- 1/15s
+      if virtual_active = '1' then
+        state <= IDLE;
+        old_stb <= PS2_Key(10);
+        if virtual_active_d = '0' then
+          key_pressed <= '0';
+          akd <= '0';
+          virtual_data <= '0';
+          old_virtual_event <= virtual_event;
+        elsif old_virtual_event /= virtual_event then
+          old_virtual_event <= virtual_event;
+          if virtual_pressed = '1' then
+            virtual_code_latched <= unsigned(virtual_code);
+            virtual_data <= '1';
             key_pressed <= '1';
-         end if;
+            akd <= '1';
+          else
+            akd <= '0';
+          end if;
+        end if;
+      elsif virtual_active_d = '1' then
+        state <= IDLE;
+        key_pressed <= '0';
+        akd <= '0';
+        virtual_data <= '0';
+        old_stb <= PS2_Key(10);
+      else
+        state <= next_state;
+        virtual_data <= '0';
+        if state = HAVE_CODE then
+          old_stb <= ps2_key(10);
+        end if;
+        if state = GOT_KEY_UP_CODE then
+          akd <= '0';
+        end if;
+        if state = NORMAL_KEY then
+          latched_code <= code ;
+          latched_ext <= ext;
+        end if;
+        if state = KEY_READY and junction_code /= x"FF" then
+          akd <= '1';
+          key_pressed <= '1';
+          rep_timer <= to_unsigned(7000000, 23);
+        end if;
+        if akd = '1' then
+          rep_timer <= rep_timer - 1;
+          if rep_timer = 0 then
+            rep_timer <= to_unsigned(933333, 23);
+            key_pressed <= '1';
+          end if;
+        end if;
       end if;
     end if;
   end process fsm;
