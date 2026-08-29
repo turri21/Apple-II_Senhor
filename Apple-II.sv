@@ -223,92 +223,24 @@ hps_io #(.CONF_STR(CONF_STR), .VDNUM(3)) hps_io
 
 ///////////////////////////////////////////////////
 
-wire  [7:0] pdl  = {~paddle_0[7], paddle_0[6:0]};
-wire [15:0] joys = status[6] ? joystick_a0 : {joystick_a0[7:0],joystick_a0[15:8]};
+wire [15:0] joya;
+wire  [5:0] joyd;
 
-// Joystick fine-tuned calibration.
-wire [15:0] joya_untrimmed = {status[17] ? pdl : joys[15:8], status[18] ? pdl : joys[7:0]};
-reg signed [7:0] joystick_x_center;
-always @(*) begin
-	case(status[38:36])
-		3'd1: joystick_x_center = -8'sd16;
-		3'd2: joystick_x_center = -8'sd32;
-		3'd3: joystick_x_center = -8'sd48;
-		3'd4: joystick_x_center = -8'sd64;
-		3'd5: joystick_x_center = -8'sd80;
-		3'd6: joystick_x_center =  8'sd32;
-		3'd7: joystick_x_center =  8'sd48;
-		default: joystick_x_center = 8'sd0;
-	endcase
-end
-wire signed [8:0] joystick_x_adjusted = $signed({joya_untrimmed[15], joya_untrimmed[15:8]}) + joystick_x_center;
-wire [7:0] joystick_x_trimmed = joystick_x_adjusted > 9'sd127 ? 8'h7F :
-	joystick_x_adjusted < -9'sd128 ? 8'h80 : joystick_x_adjusted[7:0];
-wire [15:0] joya_absolute = {joystick_x_trimmed, joya_untrimmed[7:0]};
-// End joystick fine-tuned calibration.
-
-// Relative joystick mode retains its virtual paddle position when released.
-localparam integer RELATIVE_UPDATE_CYCLES = 143182;
-localparam integer RELATIVE_UPDATE_BITS = $clog2(RELATIVE_UPDATE_CYCLES);
-reg [RELATIVE_UPDATE_BITS-1:0] relative_update_counter = 0;
-reg signed [7:0] relative_x = 0;
-reg signed [7:0] relative_y = 0;
-reg relative_mode_d = 0;
-reg signed [8:0] relative_x_delta;
-reg signed [8:0] relative_y_delta;
-
-always @(*) begin
-	relative_x_delta = 9'sd0;
-	relative_y_delta = 9'sd0;
-
-	if(joystick_0[0] && !joystick_0[1])
-		relative_x_delta = 9'sd2;
-	else if(joystick_0[1] && !joystick_0[0])
-		relative_x_delta = -9'sd2;
-	else if($signed(joys[15:8]) > 8'sd16)
-		relative_x_delta = 9'sd2;
-	else if($signed(joys[15:8]) < -8'sd16)
-		relative_x_delta = -9'sd2;
-
-	if(joystick_0[2] && !joystick_0[3])
-		relative_y_delta = 9'sd2;
-	else if(joystick_0[3] && !joystick_0[2])
-		relative_y_delta = -9'sd2;
-	else if($signed(joys[7:0]) > 8'sd16)
-		relative_y_delta = 9'sd2;
-	else if($signed(joys[7:0]) < -8'sd16)
-		relative_y_delta = -9'sd2;
-end
-
-wire signed [8:0] relative_x_next = relative_x + relative_x_delta;
-wire signed [8:0] relative_y_next = relative_y + relative_y_delta;
-
-always @(posedge clk_sys) begin
-	relative_mode_d <= status[39];
-
-	if(RESET | status[0] | buttons[1] | soft_reset | (status[39] && !relative_mode_d)) begin
-		relative_update_counter <= 0;
-		relative_x <= 0;
-		relative_y <= 0;
-	end else if(status[39]) begin
-		if(relative_update_counter == RELATIVE_UPDATE_CYCLES - 1) begin
-			relative_update_counter <= 0;
-			relative_x <= relative_x_next > 9'sd127 ? 8'sh7F :
-				relative_x_next < -9'sd128 ? 8'sh80 : relative_x_next[7:0];
-			relative_y <= relative_y_next > 9'sd127 ? 8'sh7F :
-				relative_y_next < -9'sd128 ? 8'sh80 : relative_y_next[7:0];
-		end else begin
-			relative_update_counter <= relative_update_counter + 1'd1;
-		end
-	end else begin
-		relative_update_counter <= 0;
-	end
-end
-
-wire [15:0] joya = status[39] ? {relative_x, relative_y} : joya_absolute;
-// End relative joystick mode.
-
-wire  [5:0] joyd = joystick_0[5:0] & {2'b11, {2{~|joys[7:0]}}, {2{~|joys[15:8]}}};
+joystick_input joystick_input
+(
+	.clk(clk_sys),
+	.reset(RESET | status[0] | buttons[1] | soft_reset),
+	.joystick_digital(joystick_0),
+	.joystick_analog(joystick_a0),
+	.paddle(paddle_0),
+	.swap_axes(status[6]),
+	.paddle_as_x(status[17]),
+	.paddle_as_y(status[18]),
+	.x_center(status[38:36]),
+	.relative_mode(status[39]),
+	.joy_an(joya),
+	.joy(joyd)
+);
 
 wire [9:0] core_audio_l, core_audio_r;
 wire [9:0] floppy_audio;
@@ -425,10 +357,14 @@ apple2_top apple2_top
 	.DISK_READY(DISK_READY),
 	.D1_ACTIVE(D1_ACTIVE),
 	.D2_ACTIVE(D2_ACTIVE),
+	.D1_MOTOR_ON(D1_MOTOR_ON),
+	.D2_MOTOR_ON(D2_MOTOR_ON),
 	.D1_IO_ACTIVE(D1_IO_ACTIVE),
 	.D2_IO_ACTIVE(D2_IO_ACTIVE),
 	.D1_STEP_ACTIVE(D1_STEP_ACTIVE),
 	.D2_STEP_ACTIVE(D2_STEP_ACTIVE),
+	.D1_TRACK_ZERO_STEP(D1_TRACK_ZERO_STEP),
+	.D2_TRACK_ZERO_STEP(D2_TRACK_ZERO_STEP),
 	.DISK_ACT(led),
 
 	.D1_WP(status[26]),
@@ -493,12 +429,14 @@ floppy_sound floppy_sound
 	.reset(RESET | status[0] | buttons[1] | soft_reset),
 	.enable(status[34:33] != 2'd3),
 	.gain(status[34:33]),
-	.drive1_motor(D1_ACTIVE),
-	.drive2_motor(D2_ACTIVE),
+	.drive1_motor(D1_MOTOR_ON),
+	.drive2_motor(D2_MOTOR_ON),
 	.drive1_io(D1_IO_ACTIVE),
 	.drive2_io(D2_IO_ACTIVE),
 	.drive1_step(D1_STEP_ACTIVE),
 	.drive2_step(D2_STEP_ACTIVE),
+	.drive1_track_zero_step(D1_TRACK_ZERO_STEP),
+	.drive2_track_zero_step(D2_TRACK_ZERO_STEP),
 	.sample(floppy_audio)
 );
 
@@ -622,8 +560,10 @@ always @(posedge clk_sys) begin
 end
 	
 wire D1_ACTIVE,D2_ACTIVE;
+wire D1_MOTOR_ON,D2_MOTOR_ON;
 wire D1_IO_ACTIVE,D2_IO_ACTIVE;
 wire D1_STEP_ACTIVE,D2_STEP_ACTIVE;
+wire D1_TRACK_ZERO_STEP,D2_TRACK_ZERO_STEP;
 wire TRACK1_RAM_BUSY;
 wire [12:0] TRACK1_RAM_ADDR;
 wire [7:0] TRACK1_RAM_DI;

@@ -28,6 +28,7 @@ set_global_assignment -name VHDL_FILE rtl/drive_ii.vhd
 set_global_assignment -name VHDL_FILE rtl/disk_ii_rom.vhd
 set_global_assignment -name VHDL_FILE rtl/dpram.vhd
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/floppy_track.sv
+set_global_assignment -name SYSTEMVERILOG_FILE rtl/joystick_input.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/drive_status_overlay.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/floppy_sound.sv
 set_global_assignment -name VHDL_FILE rtl/keyboard.vhd

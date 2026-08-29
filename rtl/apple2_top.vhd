@@ -90,10 +90,14 @@ port (
 	 
 	D1_ACTIVE      : buffer std_logic;             -- Disk 1 motor on
 	D2_ACTIVE      : buffer std_logic;             -- Disk 2 motor on
+  D1_MOTOR_ON    : out std_logic;
+  D2_MOTOR_ON    : out std_logic;
   D1_IO_ACTIVE   : out std_logic;
   D2_IO_ACTIVE   : out std_logic;
 	D1_STEP_ACTIVE : out std_logic;
 	D2_STEP_ACTIVE : out std_logic;
+  D1_TRACK_ZERO_STEP : out std_logic;
+  D2_TRACK_ZERO_STEP : out std_logic;
 	
 	D1_WP          : in std_logic;
 	D2_WP          : in std_logic;
@@ -433,10 +437,14 @@ begin
     D_OUT          => DISK_DO,
     D1_ACTIVE      => D1_ACTIVE, 
     D2_ACTIVE      => D2_ACTIVE,
+    D1_MOTOR_ON    => D1_MOTOR_ON,
+    D2_MOTOR_ON    => D2_MOTOR_ON,
     D1_IO_ACTIVE   => D1_IO_ACTIVE,
     D2_IO_ACTIVE   => D2_IO_ACTIVE,
     D1_STEP_ACTIVE => D1_STEP_ACTIVE,
     D2_STEP_ACTIVE => D2_STEP_ACTIVE,
+    D1_TRACK_ZERO_STEP => D1_TRACK_ZERO_STEP,
+    D2_TRACK_ZERO_STEP => D2_TRACK_ZERO_STEP,
     D1_WP          => D1_WP,
     D2_WP          => D2_WP, 
 	 
