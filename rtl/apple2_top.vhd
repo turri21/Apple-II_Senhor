@@ -92,6 +92,8 @@ port (
 	D2_ACTIVE      : buffer std_logic;             -- Disk 2 motor on
   D1_IO_ACTIVE   : out std_logic;
   D2_IO_ACTIVE   : out std_logic;
+	D1_STEP_ACTIVE : out std_logic;
+	D2_STEP_ACTIVE : out std_logic;
 	
 	D1_WP          : in std_logic;
 	D2_WP          : in std_logic;
@@ -433,6 +435,8 @@ begin
     D2_ACTIVE      => D2_ACTIVE,
     D1_IO_ACTIVE   => D1_IO_ACTIVE,
     D2_IO_ACTIVE   => D2_IO_ACTIVE,
+    D1_STEP_ACTIVE => D1_STEP_ACTIVE,
+    D2_STEP_ACTIVE => D2_STEP_ACTIVE,
     D1_WP          => D1_WP,
     D2_WP          => D2_WP, 
 	 

@@ -99,6 +99,10 @@ parameter CONF_STR = {
 	"P3OUV,Slot 5,Mouse,Mocking board,256K Saturn,Empty;",
 	"P3O6,Analog X/Y,Normal,Swapped;",
 	"P3OHI,Paddle as analog,No,X,Y;",
+	"P3o46,Joystick X center,0,-16,+16,-32,+32,-48,+48,+64;",
+	"P3-;",
+	"P3o3,Disk LED overlay,Yes,No;",
+	"P3o12,Disk drive sound,On,On (2x),On (4x),Off;",
 	"P3-;",	
 	"-;",
 	"R0,Cold Reset;",
@@ -220,10 +224,36 @@ hps_io #(.CONF_STR(CONF_STR), .VDNUM(3)) hps_io
 
 wire  [7:0] pdl  = {~paddle_0[7], paddle_0[6:0]};
 wire [15:0] joys = status[6] ? joystick_a0 : {joystick_a0[7:0],joystick_a0[15:8]};
-wire [15:0] joya = {status[17] ? pdl : joys[15:8], status[18] ? pdl : joys[7:0]};
+
+// Joystick fine-tuned calibration.
+wire [15:0] joya_untrimmed = {status[17] ? pdl : joys[15:8], status[18] ? pdl : joys[7:0]};
+reg signed [7:0] joystick_x_center;
+always @(*) begin
+	case(status[38:36])
+		3'd1: joystick_x_center = -8'sd16;
+		3'd2: joystick_x_center =  8'sd16;
+		3'd3: joystick_x_center = -8'sd32;
+		3'd4: joystick_x_center =  8'sd32;
+		3'd5: joystick_x_center = -8'sd48;
+		3'd6: joystick_x_center =  8'sd48;
+		3'd7: joystick_x_center =  8'sd64;
+		default: joystick_x_center = 8'sd0;
+	endcase
+end
+wire signed [8:0] joystick_x_adjusted = $signed({joya_untrimmed[15], joya_untrimmed[15:8]}) + joystick_x_center;
+wire [7:0] joystick_x_trimmed = joystick_x_adjusted > 9'sd127 ? 8'h7F :
+	joystick_x_adjusted < -9'sd128 ? 8'h80 : joystick_x_adjusted[7:0];
+wire [15:0] joya = {joystick_x_trimmed, joya_untrimmed[7:0]};
+// End joystick fine-tuned calibration.
+
 wire  [5:0] joyd = joystick_0[5:0] & {2'b11, {2{~|joys[7:0]}}, {2{~|joys[15:8]}}};
 
-wire [9:0] audio_l, audio_r;
+wire [9:0] core_audio_l, core_audio_r;
+wire [9:0] floppy_audio;
+wire [10:0] audio_l_sum = {1'b0, core_audio_l} + {1'b0, floppy_audio};
+wire [10:0] audio_r_sum = {1'b0, core_audio_r} + {1'b0, floppy_audio};
+wire [9:0] audio_l = audio_l_sum[10] ? 10'h3FF : audio_l_sum[9:0];
+wire [9:0] audio_r = audio_r_sum[10] ? 10'h3FF : audio_r_sum[9:0];
 
 assign AUDIO_L = {1'b0, audio_l, 5'd0};
 assign AUDIO_R = {1'b0, audio_r, 5'd0};
@@ -307,8 +337,8 @@ apple2_top apple2_top
 	.PALMODE(status[22]),
 	.ROMSWITCH(~status[23]),
 
-	.AUDIO_L(audio_l),
-	.AUDIO_R(audio_r),
+	.AUDIO_L(core_audio_l),
+	.AUDIO_R(core_audio_r),
 	.TAPE_IN(tape_adc_act & tape_adc),
 
 	.ps2_key(ps2_key),
@@ -335,6 +365,8 @@ apple2_top apple2_top
 	.D2_ACTIVE(D2_ACTIVE),
 	.D1_IO_ACTIVE(D1_IO_ACTIVE),
 	.D2_IO_ACTIVE(D2_IO_ACTIVE),
+	.D1_STEP_ACTIVE(D1_STEP_ACTIVE),
+	.D2_STEP_ACTIVE(D2_STEP_ACTIVE),
 	.DISK_ACT(led),
 
 	.D1_WP(status[26]),
@@ -393,10 +425,26 @@ wire [7:0] core_R, core_G, core_B;
 wire [7:0] R,G,B;
 wire HSync, VSync, HBlank, VBlank;
 
+floppy_sound floppy_sound
+(
+	.clk(clk_sys),
+	.reset(RESET | status[0] | buttons[1] | soft_reset),
+	.enable(status[34:33] != 2'd3),
+	.gain(status[34:33]),
+	.drive1_motor(D1_ACTIVE),
+	.drive2_motor(D2_ACTIVE),
+	.drive1_io(D1_IO_ACTIVE),
+	.drive2_io(D2_IO_ACTIVE),
+	.drive1_step(D1_STEP_ACTIVE),
+	.drive2_step(D2_STEP_ACTIVE),
+	.sample(floppy_audio)
+);
+
 drive_status_overlay drive_status_overlay
 (
 	.clk(clk_sys),
 	.reset(RESET | status[0]),
+	.enable(~status[35]),
 	.hblank(HBlank),
 	.vblank(VBlank),
 	.rgb_in({core_R, core_G, core_B}),
@@ -513,6 +561,7 @@ end
 	
 wire D1_ACTIVE,D2_ACTIVE;
 wire D1_IO_ACTIVE,D2_IO_ACTIVE;
+wire D1_STEP_ACTIVE,D2_STEP_ACTIVE;
 wire TRACK1_RAM_BUSY;
 wire [12:0] TRACK1_RAM_ADDR;
 wire [7:0] TRACK1_RAM_DI;

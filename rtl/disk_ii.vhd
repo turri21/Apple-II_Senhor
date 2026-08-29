@@ -83,6 +83,8 @@ entity disk_ii is
     D2_ACTIVE      : buffer std_logic;             -- Disk 2 motor on
     D1_IO_ACTIVE   : out std_logic;
     D2_IO_ACTIVE   : out std_logic;
+    D1_STEP_ACTIVE : out std_logic;
+    D2_STEP_ACTIVE : out std_logic;
     D1_WP          : in std_logic;
     D2_WP          : in std_logic;
     -- Track buffer interface disk 1
@@ -134,6 +136,8 @@ begin
   interpret_io : process (CLK_14M)
   begin
     if rising_edge(CLK_14M) then
+      D1_STEP_ACTIVE <= '0';
+      D2_STEP_ACTIVE <= '0';
       if reset = '1' then
         motor_phase <= (others => '0');
         drive_on <= '0';
@@ -143,6 +147,13 @@ begin
       else
         if DEVICE_SELECT = '1' then
           if A(3) = '0' then                      -- C080 - C087
+            if A(0) = '1' and motor_phase(TO_INTEGER(A(2 downto 1))) = '0' then
+              if drive2_select = '1' then
+                D2_STEP_ACTIVE <= '1';
+              else
+                D1_STEP_ACTIVE <= '1';
+              end if;
+            end if;
             motor_phase(TO_INTEGER(A(2 downto 1))) <= A(0);
           else
             case A(2 downto 1) is

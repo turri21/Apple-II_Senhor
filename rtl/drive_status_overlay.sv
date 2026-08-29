@@ -1,3 +1,25 @@
+//
+// Apple ][ drive status overlay for MiSTer FPGA
+//
+// Based on the work of
+// Copyright (c) 2016 Sorgelig
+//
+// This source file is free software: you can redistribute it and/or modify
+// it under the terms of the Lesser GNU General Public License as published
+// by the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This source file is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with this program.  If not, see <http://www.gnu.org/licenses/>.
+//
+//
+/////////////////////////////////////////////////////////////////////////
+
 module drive_status_overlay #(
 	parameter integer LED_X = 538,
 	parameter integer LED_Y = 182,
@@ -12,6 +34,7 @@ module drive_status_overlay #(
 ) (
 	input  wire        clk,
 	input  wire        reset,
+	input  wire        enable,
 	input  wire        hblank,
 	input  wire        vblank,
 	input  wire [23:0] rgb_in,
@@ -76,11 +99,11 @@ end
 
 always @(*) begin
 	rgb_out = rgb_in;
-	if(drive1_led_pixel && drive1_motor)
+	if(enable && drive1_led_pixel && drive1_motor)
 		rgb_out = drive1_activity_hold ? FLOPPY_BRIGHT_COLOR : FLOPPY_DIM_COLOR;
-	else if(drive2_led_pixel && drive2_motor)
+	else if(enable && drive2_led_pixel && drive2_motor)
 		rgb_out = drive2_activity_hold ? FLOPPY_BRIGHT_COLOR : FLOPPY_DIM_COLOR;
-	else if(hdd_led_pixel && hdd_mounted)
+	else if(enable && hdd_led_pixel && hdd_mounted)
 		rgb_out = hdd_activity_hold ? HDD_BRIGHT_COLOR : HDD_DIM_COLOR;
 end
 
