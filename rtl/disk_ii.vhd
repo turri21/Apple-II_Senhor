@@ -81,6 +81,8 @@ entity disk_ii is
     D_OUT          : out unsigned( 7 downto 0); -- To 6502
     D1_ACTIVE      : buffer std_logic;             -- Disk 1 motor on
     D2_ACTIVE      : buffer std_logic;             -- Disk 2 motor on
+    D1_IO_ACTIVE   : out std_logic;
+    D2_IO_ACTIVE   : out std_logic;
     D1_WP          : in std_logic;
     D2_WP          : in std_logic;
     -- Track buffer interface disk 1
@@ -185,6 +187,8 @@ begin
 
   D1_ACTIVE <= drive_real_on and not drive2_select;
   D2_ACTIVE <= drive_real_on and drive2_select;
+  D1_IO_ACTIVE <= read_disk and drive_real_on and not drive2_select and DISK_READY(0);
+  D2_IO_ACTIVE <= read_disk and drive_real_on and drive2_select and DISK_READY(1);
   write_mode <= q7;
 
   read_disk <= '1' when DEVICE_SELECT = '1' and A(3 downto 0) = x"C" else

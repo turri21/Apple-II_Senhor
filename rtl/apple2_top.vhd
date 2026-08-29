@@ -73,7 +73,6 @@ port (
 	joy            : in  std_logic_vector(5 downto 0);
 	joy_an         : in  std_logic_vector(15 downto 0);
 
-	
 	-- disk control
 	TRACK1         : out unsigned( 5 downto 0); -- Current track (0-34)
 	TRACK1_ADDR    : out unsigned(12 downto 0);
@@ -91,6 +90,8 @@ port (
 	 
 	D1_ACTIVE      : buffer std_logic;             -- Disk 1 motor on
 	D2_ACTIVE      : buffer std_logic;             -- Disk 2 motor on
+  D1_IO_ACTIVE   : out std_logic;
+  D2_IO_ACTIVE   : out std_logic;
 	
 	D1_WP          : in std_logic;
 	D2_WP          : in std_logic;
@@ -430,6 +431,8 @@ begin
     D_OUT          => DISK_DO,
     D1_ACTIVE      => D1_ACTIVE, 
     D2_ACTIVE      => D2_ACTIVE,
+    D1_IO_ACTIVE   => D1_IO_ACTIVE,
+    D2_IO_ACTIVE   => D2_IO_ACTIVE,
     D1_WP          => D1_WP,
     D2_WP          => D2_WP, 
 	 

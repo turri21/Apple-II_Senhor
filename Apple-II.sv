@@ -294,9 +294,9 @@ apple2_top apple2_top
 	.vblank(VBlank),
 	.hsync(HSync),
 	.vsync(VSync),
-	.r(R),
-	.g(G),
-	.b(B),
+	.r(core_R),
+	.g(core_G),
+	.b(core_B),
 	.video_switch(video_toggle),
 	.palette_switch(palette_toggle),
 	.SCREEN_MODE( status[20:19] ),
@@ -333,6 +333,8 @@ apple2_top apple2_top
 	.DISK_READY(DISK_READY),
 	.D1_ACTIVE(D1_ACTIVE),
 	.D2_ACTIVE(D2_ACTIVE),
+	.D1_IO_ACTIVE(D1_IO_ACTIVE),
+	.D2_IO_ACTIVE(D2_IO_ACTIVE),
 	.DISK_ACT(led),
 
 	.D1_WP(status[26]),
@@ -387,8 +389,25 @@ wire       scandoubler = (scale || forced_scandoubler);
 
 assign VGA_SL = sl[1:0];
 
+wire [7:0] core_R, core_G, core_B;
 wire [7:0] R,G,B;
 wire HSync, VSync, HBlank, VBlank;
+
+drive_status_overlay drive_status_overlay
+(
+	.clk(clk_sys),
+	.reset(RESET | status[0]),
+	.hblank(HBlank),
+	.vblank(VBlank),
+	.rgb_in({core_R, core_G, core_B}),
+	.drive1_motor(D1_ACTIVE),
+	.drive1_activity(D1_IO_ACTIVE),
+	.drive2_motor(D2_ACTIVE),
+	.drive2_activity(D2_IO_ACTIVE),
+	.hdd_mounted(hdd_mounted),
+	.hdd_activity(hdd_read | hdd_write),
+	.rgb_out({R, G, B})
+);
 
 video_mixer #(.LINE_LENGTH(580), .GAMMA(1)) video_mixer
 (
@@ -493,6 +512,7 @@ always @(posedge clk_sys) begin
 end
 	
 wire D1_ACTIVE,D2_ACTIVE;
+wire D1_IO_ACTIVE,D2_IO_ACTIVE;
 wire TRACK1_RAM_BUSY;
 wire [12:0] TRACK1_RAM_ADDR;
 wire [7:0] TRACK1_RAM_DI;
