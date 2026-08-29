@@ -99,7 +99,8 @@ parameter CONF_STR = {
 	"P3OUV,Slot 5,Mouse,Mocking board,256K Saturn,Empty;",
 	"P3O6,Analog X/Y,Normal,Swapped;",
 	"P3OHI,Paddle as analog,No,X,Y;",
-	"P3o46,Joystick X center,0,-16,+16,-32,+32,-48,+48,+64;",
+	"P3o46,Analog X center,0,-16,-32,-48,-64,-80,+32,+48;",
+	"P3o7,Joystick mode,Absolute,Relative;",
 	"P3-;",
 	"P3o3,Disk LED overlay,Yes,No;",
 	"P3o12,Disk drive sound,On,On (2x),On (4x),Off;",
@@ -231,20 +232,81 @@ reg signed [7:0] joystick_x_center;
 always @(*) begin
 	case(status[38:36])
 		3'd1: joystick_x_center = -8'sd16;
-		3'd2: joystick_x_center =  8'sd16;
-		3'd3: joystick_x_center = -8'sd32;
-		3'd4: joystick_x_center =  8'sd32;
-		3'd5: joystick_x_center = -8'sd48;
-		3'd6: joystick_x_center =  8'sd48;
-		3'd7: joystick_x_center =  8'sd64;
+		3'd2: joystick_x_center = -8'sd32;
+		3'd3: joystick_x_center = -8'sd48;
+		3'd4: joystick_x_center = -8'sd64;
+		3'd5: joystick_x_center = -8'sd80;
+		3'd6: joystick_x_center =  8'sd32;
+		3'd7: joystick_x_center =  8'sd48;
 		default: joystick_x_center = 8'sd0;
 	endcase
 end
 wire signed [8:0] joystick_x_adjusted = $signed({joya_untrimmed[15], joya_untrimmed[15:8]}) + joystick_x_center;
 wire [7:0] joystick_x_trimmed = joystick_x_adjusted > 9'sd127 ? 8'h7F :
 	joystick_x_adjusted < -9'sd128 ? 8'h80 : joystick_x_adjusted[7:0];
-wire [15:0] joya = {joystick_x_trimmed, joya_untrimmed[7:0]};
+wire [15:0] joya_absolute = {joystick_x_trimmed, joya_untrimmed[7:0]};
 // End joystick fine-tuned calibration.
+
+// Relative joystick mode retains its virtual paddle position when released.
+localparam integer RELATIVE_UPDATE_CYCLES = 143182;
+localparam integer RELATIVE_UPDATE_BITS = $clog2(RELATIVE_UPDATE_CYCLES);
+reg [RELATIVE_UPDATE_BITS-1:0] relative_update_counter = 0;
+reg signed [7:0] relative_x = 0;
+reg signed [7:0] relative_y = 0;
+reg relative_mode_d = 0;
+reg signed [8:0] relative_x_delta;
+reg signed [8:0] relative_y_delta;
+
+always @(*) begin
+	relative_x_delta = 9'sd0;
+	relative_y_delta = 9'sd0;
+
+	if(joystick_0[0] && !joystick_0[1])
+		relative_x_delta = 9'sd2;
+	else if(joystick_0[1] && !joystick_0[0])
+		relative_x_delta = -9'sd2;
+	else if($signed(joys[15:8]) > 8'sd16)
+		relative_x_delta = 9'sd2;
+	else if($signed(joys[15:8]) < -8'sd16)
+		relative_x_delta = -9'sd2;
+
+	if(joystick_0[2] && !joystick_0[3])
+		relative_y_delta = 9'sd2;
+	else if(joystick_0[3] && !joystick_0[2])
+		relative_y_delta = -9'sd2;
+	else if($signed(joys[7:0]) > 8'sd16)
+		relative_y_delta = 9'sd2;
+	else if($signed(joys[7:0]) < -8'sd16)
+		relative_y_delta = -9'sd2;
+end
+
+wire signed [8:0] relative_x_next = relative_x + relative_x_delta;
+wire signed [8:0] relative_y_next = relative_y + relative_y_delta;
+
+always @(posedge clk_sys) begin
+	relative_mode_d <= status[39];
+
+	if(RESET | status[0] | buttons[1] | soft_reset | (status[39] && !relative_mode_d)) begin
+		relative_update_counter <= 0;
+		relative_x <= 0;
+		relative_y <= 0;
+	end else if(status[39]) begin
+		if(relative_update_counter == RELATIVE_UPDATE_CYCLES - 1) begin
+			relative_update_counter <= 0;
+			relative_x <= relative_x_next > 9'sd127 ? 8'sh7F :
+				relative_x_next < -9'sd128 ? 8'sh80 : relative_x_next[7:0];
+			relative_y <= relative_y_next > 9'sd127 ? 8'sh7F :
+				relative_y_next < -9'sd128 ? 8'sh80 : relative_y_next[7:0];
+		end else begin
+			relative_update_counter <= relative_update_counter + 1'd1;
+		end
+	end else begin
+		relative_update_counter <= 0;
+	end
+end
+
+wire [15:0] joya = status[39] ? {relative_x, relative_y} : joya_absolute;
+// End relative joystick mode.
 
 wire  [5:0] joyd = joystick_0[5:0] & {2'b11, {2{~|joys[7:0]}}, {2{~|joys[15:8]}}};
 
