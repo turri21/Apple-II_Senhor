@@ -9,6 +9,10 @@ create_clock -period "10.0 MHz"  [get_pins -compatibility_mode hdmi_i2c|out_clk]
 derive_pll_clocks
 derive_clock_uncertainty
 
+# gamma_corr samples 14 MHz pixel data only on ce_pix, once per four or eight video clocks.
+set_multicycle_path -from [get_clocks {*|pll|pll_inst|altera_pll_i|general[1].gpll~PLL_OUTPUT_COUNTER|divclk}] -to [get_registers {*video_mixer|gamma|*}] -setup 4
+set_multicycle_path -from [get_clocks {*|pll|pll_inst|altera_pll_i|general[1].gpll~PLL_OUTPUT_COUNTER|divclk}] -to [get_registers {*video_mixer|gamma|*}] -hold 3
+
 # Decouple different clock groups (to simplify routing)
 set_clock_groups -exclusive \
    -group [get_clocks { *|pll|pll_inst|altera_pll_i|*[*].*|divclk}] \

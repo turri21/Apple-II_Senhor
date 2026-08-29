@@ -82,7 +82,7 @@ architecture rtl of apple2 is
   -- Clocks
   signal CLK_7M : std_logic;
   signal Q3, RAS_N, CAS_N, AX : std_logic;
-  signal COLOR_REF : std_logic;
+
   signal CPU_EN : std_logic;
   signal PHASE_ZERO_D : std_logic;
 
@@ -452,7 +452,7 @@ begin
     PHI0           => PHASE_ZERO,
     PHI0_EN_R      => PHASE_ZERO_R,
     PHI0_EN_F      => PHASE_ZERO_F,
-    COLOR_REF      => COLOR_REF,
+    COLOR_REF      => open,
     TEXT_MODE      => TEXT_MODE,
     PAGE2          => PAGE2,
     HIRES_MODE     => HIRES_MODE,

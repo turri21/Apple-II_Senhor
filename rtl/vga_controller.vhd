@@ -2,8 +2,8 @@
 --
 -- A VGA line-doubler for an Apple ][
 --
--- Stephen A. Edwards, sedwards@cs.columbia.edu
---
+-- Original implementation by Stephen A. Edwards, sedwards@cs.columbia.edu
+-- Palette and color enhancements by Newsdee, newsdee@gmail.com
 --
 -- The Apple ][ uses a 14.31818 MHz master clock.  It outputs a new
 -- horizontal line every 65 * 14 + 2 = 912 14M cycles.  The extra two
@@ -100,9 +100,8 @@ architecture rtl of vga_controller is
 	signal raw_rgb, seam_rgb, previous_rgb_q, current_rgb_q, filtered_rgb : unsigned(23 downto 0);
 	signal raw_hcount : unsigned(10 downto 0);
 	signal raw_active, raw_vbl, raw_color_mode, raw_color_line : std_logic;
-	signal seam_hcount : unsigned(10 downto 0);
-	signal seam_active, seam_timing_active, seam_vbl, seam_color_mode : std_logic;
-	signal current_active_q, current_timing_active_q, filtered_timing_active, line_valid_q, color_mode_q : std_logic;
+	signal seam_timing_active, seam_vbl, seam_color_mode : std_logic;
+	signal current_timing_active_q, filtered_timing_active, line_valid_q, color_mode_q : std_logic;
 	signal timing_active_delay : std_logic_vector(0 to 13) := (others => '0');
 	signal seam_rgb_window : rgb_window_t := (others => (others => '0'));
 	signal seam_luma_window, seam_saturation_window : metric_window_t := (others => 0);
@@ -568,8 +567,6 @@ begin
 		seam_color_line_window <= next_color_line;
 
 		seam_rgb <= output_rgb;
-		seam_hcount <= next_hcount(4);
-		seam_active <= next_valid(4);
 		timing_active_delay <= timing_active_delay(1 to 13) & next_valid(2);
 		seam_timing_active <= timing_active_delay(0);
 		seam_vbl <= next_vbl(4);
@@ -581,7 +578,6 @@ process (CLK_14M)
 begin
 	if rising_edge(CLK_14M) then
 		current_rgb_q <= seam_rgb;
-		current_active_q <= seam_active;
 		current_timing_active_q <= seam_timing_active;
 		line_valid_q <= previous_line_valid;
 		color_mode_q <= seam_color_mode;
