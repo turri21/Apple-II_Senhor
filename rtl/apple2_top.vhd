@@ -70,10 +70,17 @@ port (
     ROMSWITCH      : in std_logic;
 
 	PS2_Key        : in  std_logic_vector(10 downto 0);
+  virtual_keyboard_active : in std_logic;
+  virtual_keyboard_event : in std_logic;
+  virtual_keyboard_pressed : in std_logic;
+  virtual_keyboard_code : in std_logic_vector(6 downto 0);
+  virtual_control : in std_logic;
+  virtual_open_apple : in std_logic;
+  virtual_closed_apple : in std_logic;
 	joy            : in  std_logic_vector(5 downto 0);
 	joy_an         : in  std_logic_vector(15 downto 0);
 
-	
+
 	-- disk control
 	TRACK1         : out unsigned( 5 downto 0); -- Current track (0-34)
 	TRACK1_ADDR    : out unsigned(12 downto 0);
@@ -91,6 +98,14 @@ port (
 	 
 	D1_ACTIVE      : buffer std_logic;             -- Disk 1 motor on
 	D2_ACTIVE      : buffer std_logic;             -- Disk 2 motor on
+  D1_MOTOR_ON    : out std_logic;
+  D2_MOTOR_ON    : out std_logic;
+  D1_IO_ACTIVE   : out std_logic;
+  D2_IO_ACTIVE   : out std_logic;
+	D1_STEP_ACTIVE : out std_logic;
+	D2_STEP_ACTIVE : out std_logic;
+  D1_TRACK_ZERO_STEP : out std_logic;
+  D2_TRACK_ZERO_STEP : out std_logic;
 	
 	D1_WP          : in std_logic;
 	D2_WP          : in std_logic;
@@ -182,6 +197,45 @@ architecture arch of apple2_top is
         DATA_IN         : in std_logic_vector(7 downto 0);
         DATA_OUT        : out std_logic_vector(7 downto 0);
         RTC             : in std_logic_vector(64 downto 0));
+  end component;
+
+  component disk_ii is
+    port (
+      CLK_14M        : in  std_logic;
+      CLK_2M         : in  std_logic;
+      PHASE_ZERO     : in  std_logic;
+      IO_SELECT      : in  std_logic;
+      DEVICE_SELECT  : in  std_logic;
+      RESET          : in  std_logic;
+      DISK_READY     : in  std_logic_vector(1 downto 0);
+      A              : in  unsigned(15 downto 0);
+      D_IN           : in  unsigned(7 downto 0);
+      D_OUT          : out unsigned(7 downto 0);
+      D1_ACTIVE      : out std_logic;
+      D2_ACTIVE      : out std_logic;
+      D1_MOTOR_ON    : out std_logic;
+      D2_MOTOR_ON    : out std_logic;
+      D1_IO_ACTIVE   : out std_logic;
+      D2_IO_ACTIVE   : out std_logic;
+      D1_STEP_ACTIVE : out std_logic;
+      D2_STEP_ACTIVE : out std_logic;
+      D1_TRACK_ZERO_STEP : out std_logic;
+      D2_TRACK_ZERO_STEP : out std_logic;
+      D1_WP          : in  std_logic;
+      D2_WP          : in  std_logic;
+      TRACK1         : out unsigned(5 downto 0);
+      TRACK1_ADDR    : out unsigned(12 downto 0);
+      TRACK1_DI      : out unsigned(7 downto 0);
+      TRACK1_DO      : in  unsigned(7 downto 0);
+      TRACK1_WE      : out std_logic;
+      TRACK1_BUSY    : in  std_logic;
+      TRACK2         : out unsigned(5 downto 0);
+      TRACK2_ADDR    : out unsigned(12 downto 0);
+      TRACK2_DI      : out unsigned(7 downto 0);
+      TRACK2_DO      : in  unsigned(7 downto 0);
+      TRACK2_WE      : out std_logic;
+      TRACK2_BUSY    : in  std_logic
+    );
   end component;
 
 
@@ -400,6 +454,13 @@ begin
 
   keyboard : entity work.keyboard port map (
     PS2_Key  => PS2_Key,
+    virtual_active => virtual_keyboard_active,
+    virtual_event => virtual_keyboard_event,
+    virtual_pressed => virtual_keyboard_pressed,
+    virtual_code => virtual_keyboard_code,
+    virtual_control => virtual_control,
+    virtual_open_apple => virtual_open_apple,
+    virtual_closed_apple => virtual_closed_apple,
     CLK_14M  => CLK_14M,
 	 reset    => reset_cold, -- use reset_cold, not reset so we keep the
 	                         -- keyboard state machine running for key up 
@@ -417,7 +478,7 @@ begin
 	 
   DISK_ACT <= not (D1_ACTIVE or D2_ACTIVE);
 
-  disk : entity work.disk_ii port map (
+  disk : component disk_ii port map (
     CLK_14M        => CLK_14M,
     CLK_2M         => CLK_2M,
     PHASE_ZERO     => PHASE_ZERO,
@@ -430,6 +491,14 @@ begin
     D_OUT          => DISK_DO,
     D1_ACTIVE      => D1_ACTIVE, 
     D2_ACTIVE      => D2_ACTIVE,
+    D1_MOTOR_ON    => D1_MOTOR_ON,
+    D2_MOTOR_ON    => D2_MOTOR_ON,
+    D1_IO_ACTIVE   => D1_IO_ACTIVE,
+    D2_IO_ACTIVE   => D2_IO_ACTIVE,
+    D1_STEP_ACTIVE => D1_STEP_ACTIVE,
+    D2_STEP_ACTIVE => D2_STEP_ACTIVE,
+    D1_TRACK_ZERO_STEP => D1_TRACK_ZERO_STEP,
+    D2_TRACK_ZERO_STEP => D2_TRACK_ZERO_STEP,
     D1_WP          => D1_WP,
     D2_WP          => D2_WP, 
 	 

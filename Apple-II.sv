@@ -79,7 +79,10 @@ parameter CONF_STR = {
 	"P1-;",
 	"P1ON,Video Rom,US,LOCAL;",
 	"P1F1,BIN,Load 8k Video ROM;", 
-	"P1-;",	
+	"P1-;",
+	"P1oA,Virtual keyboard,Off,On;",
+	"P1o89,Keypad visibility,100%,75%,50%,25%;",
+	"P1-;",
 	"P2,Audio & Video;",
 	"P2-;",	
 	"P2O78,Stereo mix,none,25%,50%,100%;",
@@ -99,10 +102,15 @@ parameter CONF_STR = {
 	"P3OUV,Slot 5,Mouse,Mocking board,256K Saturn,Empty;",
 	"P3O6,Analog X/Y,Normal,Swapped;",
 	"P3OHI,Paddle as analog,No,X,Y;",
+	"P3o46,Analog X center,0,-16,-32,-48,-64,-72,+32,+48;",
+	"P3o7,Joystick mode,Absolute,Relative;",
 	"P3-;",	
+	"P3o3,Disk LED overlay,Yes,No;",
+	"P3o12,Disk drive sound,Off,On (1x),On (2x),On (4x);",
+	"P3-;",
 	"-;",
 	"R0,Cold Reset;",
-	"JA,Fire 1,Fire 2;",
+	"JA,Fire 1,Fire 2,Keyboard On,Keyb. visibility,Keyboard Enter,Keyboard Space;",
 	"jn,A|P,B;",
 	"jp,Y|P,B;",
 	"V,v",`BUILD_DATE
@@ -171,6 +179,54 @@ wire  [7:0] ioctl_data;
 
 wire soft_reset;
 
+wire [10:0] filtered_ps2_key;
+wire virtual_keyboard_active;
+wire virtual_keyboard_commands;
+wire [2:0] virtual_keyboard_row;
+wire [3:0] virtual_keyboard_col;
+wire virtual_keyboard_shift;
+wire virtual_keyboard_control;
+wire virtual_keyboard_caps;
+wire virtual_keyboard_shift_active;
+wire virtual_keyboard_control_active;
+wire virtual_keyboard_enabled_toggle;
+wire virtual_open_apple;
+wire virtual_closed_apple;
+wire virtual_keyboard_transparency_cycle;
+wire virtual_keyboard_top;
+wire virtual_keyboard_event;
+wire virtual_keyboard_pressed;
+wire [6:0] virtual_keyboard_code;
+wire virtual_keyboard_reset;
+
+virtual_keyboard_controller virtual_keyboard_controller
+(
+	.clk(clk_sys),
+	.reset(RESET | status[0]),
+	.ps2_key(ps2_key),
+	.joystick(joystick_0[9:0]),
+	.enabled(virtual_keyboard_enabled),
+	.filtered_ps2_key(filtered_ps2_key),
+	.active(virtual_keyboard_active),
+	.commands_page(virtual_keyboard_commands),
+	.selected_row(virtual_keyboard_row),
+	.selected_col(virtual_keyboard_col),
+	.shift_latched(virtual_keyboard_shift),
+	.control_latched(virtual_keyboard_control),
+	.caps_latched(virtual_keyboard_caps),
+	.shift_active(virtual_keyboard_shift_active),
+	.control_active(virtual_keyboard_control_active),
+	.enabled_toggle(virtual_keyboard_enabled_toggle),
+	.open_apple(virtual_open_apple),
+	.closed_apple(virtual_closed_apple),
+	.transparency_cycle(virtual_keyboard_transparency_cycle),
+	.overlay_top(virtual_keyboard_top),
+	.virtual_event(virtual_keyboard_event),
+	.virtual_pressed(virtual_keyboard_pressed),
+	.virtual_code(virtual_keyboard_code),
+	.command_reset(virtual_keyboard_reset)
+);
+
 hps_io #(.CONF_STR(CONF_STR), .VDNUM(3)) hps_io
 (
 	.clk_sys(clk_sys),
@@ -178,8 +234,8 @@ hps_io #(.CONF_STR(CONF_STR), .VDNUM(3)) hps_io
 
 	.buttons(buttons),
 	.status(status),
-	.status_in({status[63:26],palette_toggle?palette_req:status[25:24],status[23:21],video_toggle?screen_mode_req:status[20:19],status[18:0]}),
-	.status_set(video_toggle || palette_toggle),
+	.status_in({status[63:43],virtual_keyboard_enabled_toggle?~status[42]:status[42],virtual_keyboard_transparency_cycle?virtual_keyboard_transparency_req:status[41:40],status[39:26],palette_toggle?palette_req:status[25:24],status[23:21],video_toggle?screen_mode_req:status[20:19],status[18:0]}),
+	.status_set(video_toggle || palette_toggle || virtual_keyboard_transparency_cycle || virtual_keyboard_enabled_toggle),
 	.forced_scandoubler(forced_scandoubler),
 	.gamma_bus(gamma_bus),
 
@@ -218,12 +274,33 @@ hps_io #(.CONF_STR(CONF_STR), .VDNUM(3)) hps_io
 
 ///////////////////////////////////////////////////
 
-wire  [7:0] pdl  = {~paddle_0[7], paddle_0[6:0]};
-wire [15:0] joys = status[6] ? joystick_a0 : {joystick_a0[7:0],joystick_a0[15:8]};
-wire [15:0] joya = {status[17] ? pdl : joys[15:8], status[18] ? pdl : joys[7:0]};
-wire  [5:0] joyd = joystick_0[5:0] & {2'b11, {2{~|joys[7:0]}}, {2{~|joys[15:8]}}};
+wire [15:0] joya;
+wire  [5:0] joyd;
+wire [15:0] core_joya = virtual_keyboard_active ? 16'h0000 : joya;
+wire  [5:0] core_joyd = virtual_keyboard_active ? 6'h00 : joyd;
 
-wire [9:0] audio_l, audio_r;
+joystick_input joystick_input
+(
+	.clk(clk_sys),
+	.reset(RESET | status[0] | buttons[1] | virtual_keyboard_reset | soft_reset),
+	.joystick_digital(joystick_0),
+	.joystick_analog(joystick_a0),
+	.paddle(paddle_0),
+	.swap_axes(status[6]),
+	.paddle_as_x(status[17]),
+	.paddle_as_y(status[18]),
+	.x_center(status[38:36]),
+	.relative_mode(status[39]),
+	.joy_an(joya),
+	.joy(joyd)
+);
+
+wire [9:0] core_audio_l, core_audio_r;
+wire [9:0] floppy_audio;
+wire [10:0] audio_l_sum = {1'b0, core_audio_l} + {1'b0, floppy_audio};
+wire [10:0] audio_r_sum = {1'b0, core_audio_r} + {1'b0, floppy_audio};
+wire [9:0] audio_l = audio_l_sum[10] ? 10'h3FF : audio_l_sum[9:0];
+wire [9:0] audio_r = audio_r_sum[10] ? 10'h3FF : audio_r_sum[9:0];
 
 assign AUDIO_L = {1'b0, audio_l, 5'd0};
 assign AUDIO_R = {1'b0, audio_r, 5'd0};
@@ -246,6 +323,9 @@ reg       video_toggle = 0;
 reg       palette_toggle = 0;
 wire [1:0] screen_mode;
 wire [1:0] palette_mode;
+wire virtual_keyboard_enabled = status[42];
+wire [1:0] virtual_keyboard_visibility = status[41:40];
+wire [1:0] virtual_keyboard_transparency_req = virtual_keyboard_visibility + 1'd1;
 reg [1:0] screen_mode_req;
 reg [1:0] palette_req;
 
@@ -287,16 +367,16 @@ apple2_top apple2_top
 	.cpu_type(~status[5]),
 
 	.reset_cold(RESET | status[0]),
-	.reset_warm(buttons[1]),
+	.reset_warm(buttons[1] | virtual_keyboard_reset),
 	.soft_reset(soft_reset),
 
 	.hblank(HBlank),
 	.vblank(VBlank),
 	.hsync(HSync),
 	.vsync(VSync),
-	.r(R),
-	.g(G),
-	.b(B),
+	.r(core_R),
+	.g(core_G),
+	.b(core_B),
 	.video_switch(video_toggle),
 	.palette_switch(palette_toggle),
 	.SCREEN_MODE( status[20:19] ),
@@ -307,14 +387,21 @@ apple2_top apple2_top
 	.PALMODE(status[22]),
 	.ROMSWITCH(~status[23]),
 
-	.AUDIO_L(audio_l),
-	.AUDIO_R(audio_r),
+	.AUDIO_L(core_audio_l),
+	.AUDIO_R(core_audio_r),
 	.TAPE_IN(tape_adc_act & tape_adc),
 
-	.ps2_key(ps2_key),
+	.ps2_key(filtered_ps2_key),
+	.virtual_keyboard_active(virtual_keyboard_active),
+	.virtual_keyboard_event(virtual_keyboard_event),
+	.virtual_keyboard_pressed(virtual_keyboard_pressed),
+	.virtual_keyboard_code(virtual_keyboard_code),
+	.virtual_control(virtual_keyboard_control_active),
+	.virtual_open_apple(virtual_open_apple),
+	.virtual_closed_apple(virtual_closed_apple),
 
-	.joy(joyd),
-	.joy_an(joya),
+	.joy(core_joyd),
+	.joy_an(core_joya),
 	
 	.TRACK1(TRACK1),
 	.TRACK1_ADDR(TRACK1_RAM_ADDR),
@@ -333,6 +420,14 @@ apple2_top apple2_top
 	.DISK_READY(DISK_READY),
 	.D1_ACTIVE(D1_ACTIVE),
 	.D2_ACTIVE(D2_ACTIVE),
+	.D1_MOTOR_ON(D1_MOTOR_ON),
+	.D2_MOTOR_ON(D2_MOTOR_ON),
+	.D1_IO_ACTIVE(D1_IO_ACTIVE),
+	.D2_IO_ACTIVE(D2_IO_ACTIVE),
+	.D1_STEP_ACTIVE(D1_STEP_ACTIVE),
+	.D2_STEP_ACTIVE(D2_STEP_ACTIVE),
+	.D1_TRACK_ZERO_STEP(D1_TRACK_ZERO_STEP),
+	.D2_TRACK_ZERO_STEP(D2_TRACK_ZERO_STEP),
 	.DISK_ACT(led),
 
 	.D1_WP(status[26]),
@@ -369,10 +464,10 @@ apple2_top apple2_top
 	.UART_DSR(UART_DSR),
 	.RTC(RTC),
 	
-	.mouse_x({ps2_mouse[4],ps2_mouse[15:8]}),
-	.mouse_y({ps2_mouse[5],ps2_mouse[23:16]}),
-	.mouse_button(ps2_mouse[0]),
-	.mouse_strobe(mouse_strobe),
+	.mouse_x(virtual_keyboard_active ? 9'sd0 : {ps2_mouse[4],ps2_mouse[15:8]}),
+	.mouse_y(virtual_keyboard_active ? 9'sd0 : {ps2_mouse[5],ps2_mouse[23:16]}),
+	.mouse_button(virtual_keyboard_active ? 1'b0 : ps2_mouse[0]),
+	.mouse_strobe(virtual_keyboard_active ? 1'b0 : mouse_strobe),
 
 	.mouse_4_inslot(mouse_4_inslot),
 	.mouse_5_inslot(mouse_5_inslot),
@@ -387,8 +482,90 @@ wire       scandoubler = (scale || forced_scandoubler);
 
 assign VGA_SL = sl[1:0];
 
+wire [7:0] core_R, core_G, core_B;
 wire [7:0] R,G,B;
 wire HSync, VSync, HBlank, VBlank;
+wire [23:0] drive_overlay_rgb;
+wire [6:0] virtual_font_character;
+wire [2:0] virtual_font_row;
+wire [7:0] virtual_font_data;
+wire virtual_font_alternate;
+wire virtual_font_lowercase;
+
+floppy_sound floppy_sound
+(
+	.clk(clk_sys),
+	.reset(RESET | status[0] | buttons[1] | virtual_keyboard_reset | soft_reset),
+	.enable(status[34:33] != 2'd0),
+	.gain(status[34:33] - 2'd1),
+	.drive1_motor(D1_MOTOR_ON),
+	.drive2_motor(D2_MOTOR_ON),
+	.drive1_io(D1_IO_ACTIVE),
+	.drive2_io(D2_IO_ACTIVE),
+	.drive1_step(D1_STEP_ACTIVE),
+	.drive2_step(D2_STEP_ACTIVE),
+	.drive1_track_zero_step(D1_TRACK_ZERO_STEP),
+	.drive2_track_zero_step(D2_TRACK_ZERO_STEP),
+	.sample(floppy_audio)
+);
+
+drive_status_overlay drive_status_overlay
+(
+	.clk(clk_sys),
+	.reset(RESET | status[0]),
+	.enable(~status[35]),
+	.hblank(HBlank),
+	.vblank(VBlank),
+	.rgb_in({core_R, core_G, core_B}),
+	.drive1_motor(D1_ACTIVE),
+	.drive1_activity(D1_IO_ACTIVE),
+	.drive2_motor(D2_ACTIVE),
+	.drive2_activity(D2_IO_ACTIVE),
+	.hdd_mounted(hdd_mounted),
+	.hdd_activity(hdd_read | hdd_write),
+	.rgb_out(drive_overlay_rgb)
+);
+
+apple2_font_rom apple2_font_rom
+(
+	.CLK_14M(clk_sys),
+	.ROMSWITCH(~status[23]),
+	.alternate_character(virtual_font_alternate),
+	.lowercase_character(virtual_font_lowercase),
+	.character_code(virtual_font_character),
+	.glyph_row(virtual_font_row),
+	.ioctl_addr(ioctl_addr),
+	.ioctl_data(ioctl_data),
+	.ioctl_wr(ioctl_wr),
+	.glyph_data(virtual_font_data)
+);
+
+virtual_keyboard_overlay virtual_keyboard_overlay
+(
+	.clk(clk_sys),
+	.reset(RESET | status[0]),
+	.active(virtual_keyboard_active),
+	.commands_page(virtual_keyboard_commands),
+	.selected_row(virtual_keyboard_row),
+	.selected_col(virtual_keyboard_col),
+	.shift_latched(virtual_keyboard_shift_active),
+	.control_latched(virtual_keyboard_control_active),
+	.caps_latched(virtual_keyboard_caps),
+	.open_apple(virtual_open_apple),
+	.closed_apple(virtual_closed_apple),
+	.transparency(virtual_keyboard_visibility),
+	.overlay_top(virtual_keyboard_top),
+	.pixel_clock_double(!status[16]),
+	.hblank(HBlank),
+	.vblank(VBlank),
+	.rgb_in(drive_overlay_rgb),
+	.font_alternate(virtual_font_alternate),
+	.font_lowercase(virtual_font_lowercase),
+	.font_character(virtual_font_character),
+	.font_row(virtual_font_row),
+	.font_data(virtual_font_data),
+	.rgb_out({R, G, B})
+);
 
 video_mixer #(.LINE_LENGTH(580), .GAMMA(1)) video_mixer
 (
@@ -423,7 +600,7 @@ always @(posedge clk_sys) begin
 	end
 end
 
-wire dd_reset = RESET | status[0] | buttons[1] | soft_reset;
+wire dd_reset = RESET | status[0] | buttons[1] | virtual_keyboard_reset | soft_reset;
 
 reg  hdd_mounted = 0;
 wire hdd_read;
@@ -493,6 +670,10 @@ always @(posedge clk_sys) begin
 end
 	
 wire D1_ACTIVE,D2_ACTIVE;
+wire D1_MOTOR_ON,D2_MOTOR_ON;
+wire D1_IO_ACTIVE,D2_IO_ACTIVE;
+wire D1_STEP_ACTIVE,D2_STEP_ACTIVE;
+wire D1_TRACK_ZERO_STEP,D2_TRACK_ZERO_STEP;
 wire TRACK1_RAM_BUSY;
 wire [12:0] TRACK1_RAM_ADDR;
 wire [7:0] TRACK1_RAM_DI;

@@ -26,6 +26,7 @@ entity drive_ii is
     WRITE_MODE    : in  std_logic;
     READ_DISK     : in  std_logic; -- C08C
     WRITE_REG     : in  std_logic; -- C08F/D
+    TRACK_ZERO_STEP : out std_logic;
     -- Track buffer interface
     TRACK         : out unsigned( 5 downto 0); -- Current track (0-34)
     TRACK_ADDR    : out unsigned(12 downto 0);
@@ -57,7 +58,9 @@ begin
   begin
       if reset = '1' then
         phase <= TO_UNSIGNED(70, 8);    -- Deliberately odd to test reset
+        TRACK_ZERO_STEP <= '0';
       elsif rising_edge(CLK_14M) then
+        TRACK_ZERO_STEP <= '0';
         if DISK_ACTIVE = '1' then
           phase_change := 0;
           new_phase := TO_INTEGER(phase);
@@ -110,6 +113,9 @@ begin
           end if;
 
           if new_phase + phase_change <= 0 then
+            if phase_change < 0 then
+              TRACK_ZERO_STEP <= '1';
+            end if;
             new_phase := 0;
           elsif new_phase + phase_change > 139 then
             new_phase := 139;

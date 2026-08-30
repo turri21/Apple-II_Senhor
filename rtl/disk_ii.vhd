@@ -81,6 +81,14 @@ entity disk_ii is
     D_OUT          : out unsigned( 7 downto 0); -- To 6502
     D1_ACTIVE      : buffer std_logic;             -- Disk 1 motor on
     D2_ACTIVE      : buffer std_logic;             -- Disk 2 motor on
+    D1_MOTOR_ON    : out std_logic;
+    D2_MOTOR_ON    : out std_logic;
+    D1_IO_ACTIVE   : out std_logic;
+    D2_IO_ACTIVE   : out std_logic;
+    D1_STEP_ACTIVE : out std_logic;
+    D2_STEP_ACTIVE : out std_logic;
+    D1_TRACK_ZERO_STEP : out std_logic;
+    D2_TRACK_ZERO_STEP : out std_logic;
     D1_WP          : in std_logic;
     D2_WP          : in std_logic;
     -- Track buffer interface disk 1
@@ -132,6 +140,8 @@ begin
   interpret_io : process (CLK_14M)
   begin
     if rising_edge(CLK_14M) then
+      D1_STEP_ACTIVE <= '0';
+      D2_STEP_ACTIVE <= '0';
       if reset = '1' then
         motor_phase <= (others => '0');
         drive_on <= '0';
@@ -141,6 +151,13 @@ begin
       else
         if DEVICE_SELECT = '1' then
           if A(3) = '0' then                      -- C080 - C087
+            if A(0) = '1' and motor_phase(TO_INTEGER(A(2 downto 1))) = '0' then
+              if drive2_select = '1' then
+                D2_STEP_ACTIVE <= '1';
+              else
+                D1_STEP_ACTIVE <= '1';
+              end if;
+            end if;
             motor_phase(TO_INTEGER(A(2 downto 1))) <= A(0);
           else
             case A(2 downto 1) is
@@ -185,6 +202,10 @@ begin
 
   D1_ACTIVE <= drive_real_on and not drive2_select;
   D2_ACTIVE <= drive_real_on and drive2_select;
+  D1_MOTOR_ON <= drive_on and not drive2_select;
+  D2_MOTOR_ON <= drive_on and drive2_select;
+  D1_IO_ACTIVE <= read_disk and drive_real_on and not drive2_select and DISK_READY(0);
+  D2_IO_ACTIVE <= read_disk and drive_real_on and drive2_select and DISK_READY(1);
   write_mode <= q7;
 
   read_disk <= '1' when DEVICE_SELECT = '1' and A(3 downto 0) = x"C" else
@@ -211,6 +232,7 @@ begin
     WRITE_MODE     => write_mode,
     READ_DISK      => read_disk,    -- C08C
     WRITE_REG      => write_reg,    -- C08F/D
+    TRACK_ZERO_STEP => D1_TRACK_ZERO_STEP,
     -- Track buffer interface
     TRACK          => TRACK1, -- Current track (0-34)
     TRACK_ADDR     => TRACK1_ADDR,
@@ -234,6 +256,7 @@ begin
     WRITE_MODE     => write_mode,
     READ_DISK      => read_disk,    -- C08C
     WRITE_REG      => write_reg,    -- C08F/D
+    TRACK_ZERO_STEP => D2_TRACK_ZERO_STEP,
     -- Track buffer interface
     TRACK          => TRACK2, -- Current track (0-34)
     TRACK_ADDR     => TRACK2_ADDR,
